@@ -1,0 +1,16 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "SwiftCSV",
+        "repositoryURL": "https://github.com/swiftcsv/SwiftCSV",
+        "state": {
+          "branch": "master",
+          "revision": "806180735a9c4ad51ff6aed5e6ca502083a3f388",
+          "version": null
+        }
+      }
+    ]
+  },
+  "version": 1
+}
