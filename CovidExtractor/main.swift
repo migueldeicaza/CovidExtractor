@@ -2,9 +2,21 @@
 //  main.swift
 //  CovidExtractor
 //
+// This extracts the data from the US and the global cities,
+// and produces json versions with an index with basic information,
+// and then a detailed separate file with the last 20 days of confirmed
+// and death cases.
+//
+// additionally this needs to aggregate state data (for the US) and
+// country data (international)
+//
 //  Created by Miguel de Icaza on 10/8/20.
 //
 
+// Scenarios:
+//   countryRegion == "US" && admin = nil, this is a state in "provinceState"
+//   countryRegion == "US", state is provinceState, county is "admin"
+//   otherwise Country == specified, provinceRegion is the subregioin
 import Foundation
 import SwiftCSV
 
@@ -15,7 +27,11 @@ func populateDeathUS (slot: inout TrackedLocation, row: [String])
     slot.countryRegion = row [7]
     slot.lat = row [8]
     slot.long = row [9]
+    //slot.title = "\(slot.admin!), \(slot.proviceState!)"
 }
+
+var statesLocations: [String:TrackedLocation] = [:]
+var statesSnapshots: [String:Snapshot] = [:]
 
 func extractUS (_ n: Int, _ fdeaths: CSV, _ fcases: CSV)
 {
@@ -26,13 +42,31 @@ func extractUS (_ n: Int, _ fdeaths: CSV, _ fcases: CSV)
         if key == "" {
             continue
         }
+        
+        let provinceState = r [6]
         var slot = gd.globals [key] ?? TrackedLocation ()
+        var stateSlot = gd.globals [provinceState] ?? TrackedLocation ()
         populateDeathUS(slot: &slot, row: r)
+        stateSlot.proviceState = provinceState
+        stateSlot.countryRegion = r [7]
+        stateSlot.lat = r [8]
+        stateSlot.long = r [9]
+        //stateSlot.title = provinceState
         gd.globals [key] = slot
+        gd.globals [provinceState] = stateSlot
         
         var snapshot = sd.snapshots [key] ?? Snapshot ()
+        var stateSnapshot = sd.snapshots [provinceState] ?? Snapshot ()
         snapshot.lastDeaths = Array (r [r.count-n..<r.count].map { Int ($0)! })
+        if let stateArray = stateSnapshot.lastDeaths {
+            for i in 0..<stateArray.count {
+                stateSnapshot.lastDeaths [i] += snapshot.lastDeaths [i]
+            }
+        } else {
+            stateSnapshot.lastDeaths = snapshot.lastDeaths
+        }
         sd.snapshots [key] = snapshot
+        sd.snapshots [provinceState] = stateSnapshot
     }
     
     for r in fcases.enumeratedRows {
@@ -41,9 +75,19 @@ func extractUS (_ n: Int, _ fdeaths: CSV, _ fcases: CSV)
             continue
         }
 
+        let provinceState = r [6]
         var snapshot = sd.snapshots [key]!
+        var stateSnapshot = sd.snapshots [provinceState]!
         snapshot.lastConfirmed = Array (r [r.count-n..<r.count].map { Int ($0)! })
+        if let stateArray = stateSnapshot.lastConfirmed {
+            for i in 0..<stateArray.count {
+                stateSnapshot.lastConfirmed [i] += snapshot.lastConfirmed [i]
+            }
+        } else {
+            stateSnapshot.lastConfirmed = snapshot.lastConfirmed
+        }
         sd.snapshots [key] = snapshot
+        sd.snapshots [provinceState] = stateSnapshot
     }
 }
 
@@ -76,11 +120,28 @@ func populateDeathWorld (slot: inout TrackedLocation, row: [String])
     slot.long = row [3]
 }
 
+func makeWorldKey (_ r: [String]) -> String
+{
+    if r [0] == "" {
+        return r [1]
+    }
+    return "\(r[0]), \(r[1])"
+}
 func extractWorld (_ n: Int, _ fdeaths: CSV, _ fcases: CSV)
 {
+//
+//    var stateSnapshot = sd.snapshots [provinceState] ?? Snapshot ()
+//    snapshot.lastDeaths = Array (r [r.count-n..<r.count].map { Int ($0)! })
+//    if let stateArray = stateSnapshot.lastDeaths {
+//        for i in 0..<stateArray.count {
+//            stateSnapshot.lastDeaths [i] += snapshot.lastDeaths [i]
+//        }
+//    } else {
+//        stateSnapshot.lastDeaths = snapshot.lastDeaths
+//    }
     // Now populate the data
     for r in fdeaths.enumeratedRows {
-        let key = r [0] + "," + r [1]
+        let key = makeWorldKey(r)
         
         var slot = gd.globals [key] ?? TrackedLocation ()
         populateDeathWorld(slot: &slot, row: r)
@@ -92,11 +153,12 @@ func extractWorld (_ n: Int, _ fdeaths: CSV, _ fcases: CSV)
     }
     
     for r in fcases.enumeratedRows {
-        let key = r [0] + "," + r [1]
+        let key = makeWorldKey(r)
 
         var snapshot = sd.snapshots [key]!
         snapshot.lastConfirmed = Array (r [r.count-n..<r.count].map { Int($0)! })
         sd.snapshots [key] = snapshot
+        
     }
 }
 
@@ -110,6 +172,12 @@ func saveData ()
     
     let data = try! encoder.encode (sd)
     try! data.write (to: URL(fileURLWithPath: "/tmp/individual"))
+    
+    for x in sd.snapshots {
+        let small = try! encoder.encode (x.value)
+        try! small.write (to: URL(fileURLWithPath: "/tmp/ind/\(x.key)"))
+        
+    }
 }
 
 // validate that we got data for everything
@@ -128,7 +196,7 @@ let cases = "COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_c
 let deathsWorld = "COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv"
 let casesWorld = "COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv"
 
-let days = 20
+let days = 40
 var fdeaths = try! CSV(url: URL(fileURLWithPath: prefix + deaths))
 var fcases = try! CSV(url: URL(fileURLWithPath: prefix + cases))
 
