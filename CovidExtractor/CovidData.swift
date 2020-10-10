@@ -151,3 +151,65 @@ public func fetch (code: String) -> Stats
 }
 
 
+var fmtDecimal: NumberFormatter = {
+    var fmt = NumberFormatter()
+    fmt.numberStyle = .decimal
+    fmt.maximumFractionDigits = 2
+    
+    return fmt
+} ()
+
+var fmtDecimal1: NumberFormatter = {
+    var fmt = NumberFormatter()
+    fmt.numberStyle = .decimal
+    fmt.maximumFractionDigits = 1
+    
+    return fmt
+} ()
+
+var fmtNoDecimal: NumberFormatter = {
+    var fmt = NumberFormatter()
+    fmt.numberStyle = .decimal
+    fmt.maximumFractionDigits = 0
+    return fmt
+} ()
+
+
+public func fmtLarge (_ n: Int) -> String
+{
+    switch n {
+    case let x where x < 0:
+        return "0."     // "0." as a flag to determine something went wrong
+        
+    case 0..<99999:
+        return fmtDecimal.string(from: NSNumber (value: n)) ?? "?"
+        
+    case 100000..<999999:
+        return (fmtNoDecimal.string(from: NSNumber (value: Float (n)/1000.0)) ?? "?") + "k"
+        
+    default:
+        return fmtNoDecimal.string(from: NSNumber (value: Float (n)/1000000.0)) ?? "?" + "M"
+    }
+}
+
+public func fmtDigit (_ n: Int) -> String {
+    return fmtDecimal.string (from: NSNumber (value: n)) ?? "?"
+}
+
+public func fmtDelta (_ n: Int) -> String
+{
+    switch n {
+    case let x where x < 0:
+        return "-0"     // "-0" as a flag to determine something went wrong
+        
+    case 0..<9999:
+        return "+" + (fmtDecimal.string(from: NSNumber (value: n)) ?? "?")
+        
+    case 10000..<999999:
+        return "+" + (fmtDecimal1.string(from: NSNumber (value: Float (n)/1000.0)) ?? "?") + "k"
+        
+    default:
+        return "+" + (fmtDecimal.string(from: NSNumber (value: Float (n)/1000000.0)) ?? "?") + "M"
+    }
+}
+
