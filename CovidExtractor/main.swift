@@ -33,7 +33,7 @@ func populateDeathUS (slot: inout TrackedLocation, row: [String])
 var statesLocations: [String:TrackedLocation] = [:]
 var statesSnapshots: [String:Snapshot] = [:]
 
-func extractUS (_ n: Int, _ fdeaths: CSV, _ fcases: CSV)
+func extractUS (_ fdeaths: CSV, _ fcases: CSV)
 {
     // Now populate the data
     for r in fdeaths.enumeratedRows {
@@ -42,7 +42,7 @@ func extractUS (_ n: Int, _ fdeaths: CSV, _ fcases: CSV)
         if key == "" {
             continue
         }
-        
+
         let provinceState = r [6]
         var slot = gd.globals [key] ?? TrackedLocation ()
         var stateSlot = gd.globals [provinceState] ?? TrackedLocation ()
@@ -57,7 +57,7 @@ func extractUS (_ n: Int, _ fdeaths: CSV, _ fcases: CSV)
         
         var snapshot = sd.snapshots [key] ?? Snapshot ()
         var stateSnapshot = sd.snapshots [provinceState] ?? Snapshot ()
-        snapshot.lastDeaths = Array (r [r.count-n..<r.count].map { Int ($0)! })
+        snapshot.lastDeaths = Array (r [12...].map { Int ($0)! })
         if let stateArray = stateSnapshot.lastDeaths {
             for i in 0..<stateArray.count {
                 stateSnapshot.lastDeaths [i] += snapshot.lastDeaths [i]
@@ -74,11 +74,10 @@ func extractUS (_ n: Int, _ fdeaths: CSV, _ fcases: CSV)
         if key == "" {
             continue
         }
-
         let provinceState = r [6]
         var snapshot = sd.snapshots [key]!
         var stateSnapshot = sd.snapshots [provinceState]!
-        snapshot.lastConfirmed = Array (r [r.count-n..<r.count].map { Int ($0)! })
+        snapshot.lastConfirmed = Array (r [11...].map { Int ($0)! })
         if let stateArray = stateSnapshot.lastConfirmed {
             for i in 0..<stateArray.count {
                 stateSnapshot.lastConfirmed [i] += snapshot.lastConfirmed [i]
@@ -148,7 +147,7 @@ func extractWorld (_ n: Int, _ fdeaths: CSV, _ fcases: CSV)
         gd.globals [key] = slot
         
         var snapshot = sd.snapshots [key] ?? Snapshot ()
-        snapshot.lastDeaths = Array (r [r.count-n..<r.count].map { Int($0)! })
+        snapshot.lastDeaths = Array (r [4...].map { Int($0)! })
         sd.snapshots [key] = snapshot
     }
     
@@ -156,7 +155,7 @@ func extractWorld (_ n: Int, _ fdeaths: CSV, _ fcases: CSV)
         let key = makeWorldKey(r)
 
         var snapshot = sd.snapshots [key]!
-        snapshot.lastConfirmed = Array (r [r.count-n..<r.count].map { Int($0)! })
+        snapshot.lastConfirmed = Array (r [4...].map { Int($0)! })
         sd.snapshots [key] = snapshot
         
     }
@@ -168,13 +167,14 @@ func saveData ()
     encoder.dateEncodingStrategy = .iso8601
     encoder.outputFormatting = .prettyPrinted
     let global = try! encoder.encode(gd)
-    try! global.write(to: URL(fileURLWithPath: "/tmp/global"))
+    try! global.write(to: URL(fileURLWithPath: "/Users/miguel/cvs/CovidGraphs/global"))
     
     let data = try! encoder.encode (sd)
     try! data.write (to: URL(fileURLWithPath: "/tmp/individual"))
     
     for x in sd.snapshots {
-        let small = try! encoder.encode (x.value)
+        var y = IndividualSnapshot (snapshot: x.value)
+        let small = try! encoder.encode (y)
         try! small.write (to: URL(fileURLWithPath: "/tmp/ind/\(x.key)"))
         
     }
@@ -204,7 +204,7 @@ gd = GlobalData()
 sd = SnapshotData()
 validateUS(fdeaths, fcases)
 
-extractUS (days, fdeaths, fcases)
+extractUS (fdeaths, fcases)
 
 fdeaths = try! CSV(url: URL(fileURLWithPath: prefix + deathsWorld))
 fcases = try! CSV(url: URL(fileURLWithPath: prefix + casesWorld))

@@ -9,7 +9,7 @@ import Foundation
 
 let formatVersion = 1
 
-// Imported from the Json file
+/// Imported from the Json file
 public struct TrackedLocation: Codable {
     public var title: String!
     public var admin: String!
@@ -26,10 +26,17 @@ public struct Snapshot: Codable {
     public var lastConfirmed: [Int]!
 }
 
+/// All of the locations we are tracking
 public struct GlobalData: Codable {
     public var time: Date = Date()
     public var version: Int = formatVersion
     public var globals: [String:TrackedLocation] = [:]
+}
+
+public struct IndividualSnapshot: Codable {
+    public var time: Date = Date()
+    public var version: Int = formatVersion
+    public var snapshot: Snapshot
 }
 
 public struct SnapshotData: Codable {
@@ -38,14 +45,27 @@ public struct SnapshotData: Codable {
     public var snapshots: [String:Snapshot] = [:]
 }
 
+/// Contains the data for a given location
 public struct Stats {
+    /// Caption for the location
     public var caption: String
+    /// Subcation to show for the location
     public var subCaption: String?
-    public var totalCases, deltaCases: Int
+    /// Total number of cases for that location
+    public var totalCases: Int
+    /// Number of new cases in the last day for that location
+    public var deltaCases: Int
+    /// Array of total cases since the beginning
     public var cases: [Int]
+    /// Array of change of cases per day
     public var casesDelta: [Int]
-    public var totalDeaths, deltaDeaths: Int
+    /// Total number of deaths in that location
+    public var totalDeaths: Int
+    /// Total of new deaths in the last day for that location
+    public var deltaDeaths: Int
+    /// Array of total deaths since the beginning
     public var deaths: [Int]
+    /// Array of changes in deaths since the beginning
     public var deathsDelta: [Int]
 }
 
