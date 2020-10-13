@@ -126,6 +126,9 @@ func makeWorldKey (_ r: [String]) -> String
     }
     return "\(r[0]), \(r[1])"
 }
+
+var gd: GlobalData!
+
 func extractWorld (_ n: Int, _ fdeaths: CSV, _ fcases: CSV)
 {
 //
