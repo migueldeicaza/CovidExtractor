@@ -37,10 +37,13 @@ func extractUS (_ fdeaths: CSV, _ fcases: CSV)
 {
     // Now populate the data
     for r in fdeaths.enumeratedRows {
-        let key = r [4] // fips
-        
+        var key = r [4] // fips
         if key == "" {
             continue
+        }
+
+        if !key.hasSuffix(".0") {
+            key = key + ".0"
         }
 
         let provinceState = r [6]
