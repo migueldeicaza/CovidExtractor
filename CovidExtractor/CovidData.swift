@@ -73,12 +73,20 @@ public struct Stats: Hashable {
     public var lat, long: String!
 }
 
+/// Returns a configured decoder for our data files
 func makeDecoder () -> JSONDecoder {
     let d = JSONDecoder()
     d.dateDecodingStrategy = .iso8601
     return d
 }
 
+/// Returns the URL for the specific region code
+func cacheFileForRegion (code: String) -> URL? {
+    if let cacheDir = try? FileManager.default.url(for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true) {
+        return cacheDir.appendingPathComponent(code)
+    }
+    return nil
+}
 ///
 /// An observable `Stats` object that can start as nil (no data available), and can be updated over time (when we load from the
 /// cache, or fetch new data from the network)
@@ -94,7 +102,15 @@ public class UpdatableStat: ObservableObject, Hashable, Equatable {
     {
         self.code = code
         self.tl = globalData.globals [code]
-        load ()
+        
+        if let existing = IndividualSnapshot.tryLoadCache(name: code) {
+            // If it is fresh enough, no need to download
+            if existing.time + TimeInterval(24*60*60) > Date () {
+                self.stat = makeStat(trackedLocation: self.tl, snapshot: existing.snapshot, date: existing.time)
+                return
+            }
+        }
+        fetchNewSnapshot ()
     }
     
     // This hash function set the uniqueness based on the address
@@ -109,12 +125,13 @@ public class UpdatableStat: ObservableObject, Hashable, Equatable {
             lhs.tl == rhs.tl
     }
 
-    func load (){
+    func fetchNewSnapshot (){
         let url = URL(string: "https://tirania.org/covid-data/\(code)")!
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         
         let task = URLSession.shared.dataTask(with: request) {(data, response, error) in
+            //print ("Response: \(response)")
             guard error == nil else {
                 print ("error: \(error!)")
                 return
@@ -123,6 +140,10 @@ public class UpdatableStat: ObservableObject, Hashable, Equatable {
             guard let content = data else {
                 print("No data")
                 return
+            }
+            if let cacheFile = cacheFileForRegion(code: self.code) {
+                //print ("Saving to \(cacheFile)")
+                try! content.write(to: cacheFile)
             }
             let decoder = makeDecoder()
             if let isnap = try? decoder.decode(IndividualSnapshot.self, from: content) {
@@ -163,9 +184,8 @@ extension IndividualSnapshot {
  
     static public func tryLoadCache (name: String) -> IndividualSnapshot?
     {
-        if let cacheDir = try? FileManager.default.url(for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true) {
-            let file = cacheDir.appendingPathComponent(name)
-            
+        if let file = cacheFileForRegion(code: name) {
+            //print ("Loading from \(file)")
             if let data = try? Data (contentsOf: file) {
                 let decoder = makeDecoder()
                 if let snapshot = try? decoder.decode(IndividualSnapshot.self, from: data) {
