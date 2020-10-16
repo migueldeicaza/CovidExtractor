@@ -239,17 +239,10 @@ func makeDelta (_ v: [Int]) -> [Int]
     return result
 }
 
-public func makeStat (trackedLocation: TrackedLocation, snapshot: Snapshot, date: Date = Date()) -> Stats
+public func getCaptions (trackedLocation: TrackedLocation) -> (caption: String, subcaption: String?)
 {
-    let last2Deaths = Array (snapshot.lastDeaths.suffix(2))
-    let totalDeaths = last2Deaths[1]
-    let deltaDeaths = last2Deaths[1]-last2Deaths[0]
-    let last2Cases = Array(snapshot.lastConfirmed.suffix(2))
-    let totalCases = last2Cases [1]
-    let deltaCases = last2Cases[1]-last2Cases[0]
-    
     var caption: String
-    var subcaption: String?
+    var subcaption: String? = nil
     
     if trackedLocation.countryRegion == "US" {
         if trackedLocation.admin == nil {
@@ -266,6 +259,20 @@ public func makeStat (trackedLocation: TrackedLocation, snapshot: Snapshot, date
             subcaption = trackedLocation.countryRegion
         }
     }
+    return (caption, subcaption)
+}
+
+public func makeStat (trackedLocation: TrackedLocation, snapshot: Snapshot, date: Date = Date()) -> Stats
+{
+    let last2Deaths = Array (snapshot.lastDeaths.suffix(2))
+    let totalDeaths = last2Deaths[1]
+    let deltaDeaths = last2Deaths[1]-last2Deaths[0]
+    let last2Cases = Array(snapshot.lastConfirmed.suffix(2))
+    let totalCases = last2Cases [1]
+    let deltaCases = last2Cases[1]-last2Cases[0]
+
+    let (caption, subcaption) = getCaptions (trackedLocation: trackedLocation)
+    
     return Stats (updateTime: date,
                   caption: caption,
                   subCaption: subcaption,
