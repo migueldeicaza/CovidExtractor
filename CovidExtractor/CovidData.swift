@@ -17,6 +17,30 @@ public struct TrackedLocation: Codable, Equatable, Hashable {
     public var proviceState: String!
     public var countryRegion: String!
     public var lat, long: String!
+    
+    public func getCaptions () -> (caption: String, subcaption: String?)
+    {
+        var caption: String
+        var subcaption: String? = nil
+        
+        if countryRegion == "US" {
+            if admin == nil {
+                caption = proviceState
+            } else {
+                caption = admin
+                subcaption = proviceState
+            }
+        } else {
+            if proviceState == "" {
+                caption = countryRegion
+            } else {
+                caption = proviceState
+                subcaption = countryRegion
+            }
+        }
+        return (caption, subcaption)
+    }
+
 }
 
 // Imported from the JSON file, tends to have the last N samples (20 or so)
@@ -62,6 +86,8 @@ public struct Stats: Hashable {
     public var cases: [Int]
     /// Array of change of cases per day
     public var casesDelta: [Int]
+    /// Smoothed Array of change of cases per day
+    public var casesDeltaSmooth: [Int]
     /// Total number of deaths in that location
     public var totalDeaths: Int
     /// Total of new deaths in the last day for that location
@@ -70,6 +96,9 @@ public struct Stats: Hashable {
     public var deaths: [Int]
     /// Array of changes in deaths since the beginning
     public var deathsDelta: [Int]
+    
+    /// Smoothed Array of changes in deaths since the beginning
+    public var deathsDeltaSmooth: [Int]
     public var lat, long: String!
 }
 
@@ -96,21 +125,31 @@ public class UpdatableStat: ObservableObject, Hashable, Equatable {
     @Published public var stat: Stats? = nil
     public var code: String
     var tl: TrackedLocation!
-
+    var lock: NSLock? = nil
+    
     /// Creates an UpdatableStat with a `code` that reprensents one of the known locations that we have statistics for
-    public init (code: String)
+    public init (code: String, sync: Bool = false)
     {
         self.code = code
         self.tl = globalData.globals [code]
         
         if let existing = IndividualSnapshot.tryLoadCache(name: code) {
+//            var current = Calendar.current
+//            var components = current.dateComponents(in: current.timeZone, from: Date ())
+            
             // If it is fresh enough, no need to download
             if existing.time + TimeInterval(24*60*60) > Date () {
                 self.stat = makeStat(trackedLocation: self.tl, snapshot: existing.snapshot, date: existing.time)
                 return
             }
         }
-        fetchNewSnapshot ()
+        if sync {
+            lock = NSLock()
+        }
+        fetchNewSnapshot()
+        if sync {
+            lock?.lock ()
+        }
     }
     
     // This hash function set the uniqueness based on the address
@@ -125,30 +164,27 @@ public class UpdatableStat: ObservableObject, Hashable, Equatable {
             lhs.tl == rhs.tl
     }
 
-    func fetchNewSnapshot (){
-        let url = URL(string: "https://tirania.org/covid-data/\(code)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
+    public func receivedData (data: Data?, response: URLResponse?, error: Error?)
+    {
+        guard error == nil else {
+            print ("error: \(error!)")
+            return
+        }
         
-        let task = URLSession.shared.dataTask(with: request) {(data, response, error) in
-            //print ("Response: \(response)")
-            guard error == nil else {
-                print ("error: \(error!)")
-                return
-            }
-            
-            guard let content = data else {
-                print("No data")
-                return
-            }
-            if let cacheFile = cacheFileForRegion(code: self.code) {
-                //print ("Saving to \(cacheFile)")
-                try! content.write(to: cacheFile)
-            }
-            let decoder = makeDecoder()
-            if let isnap = try? decoder.decode(IndividualSnapshot.self, from: content) {
-                // Put a sleep here to simulate slow network responses
-                //sleep(4)
+        guard let content = data else {
+            print("No data")
+            return
+        }
+        if let cacheFile = cacheFileForRegion(code: self.code) {
+            //print ("Saving to \(cacheFile)")
+            try! content.write(to: cacheFile)
+        }
+        let decoder = makeDecoder()
+        if let isnap = try? decoder.decode(IndividualSnapshot.self, from: content) {
+            if let l = lock {
+                self.stat = makeStat(trackedLocation: self.tl, snapshot: isnap.snapshot, date: isnap.time)
+                l.unlock()
+            } else {
                 DispatchQueue.main.async {
                     
                     self.stat = makeStat(trackedLocation: self.tl, snapshot: isnap.snapshot, date: isnap.time)
@@ -156,6 +192,15 @@ public class UpdatableStat: ObservableObject, Hashable, Equatable {
                 }
             }
         }
+    }
+    
+    public func fetchNewSnapshot (session: URLSession? = nil){
+        let url = URL(string: "https://tirania.org/covid-data/\(code)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        
+        let task = (session ?? URLSession.shared).dataTask(with: request, completionHandler: receivedData(data:response:error:))
+        
         task.resume()
     }
 }
@@ -181,7 +226,6 @@ public class UpdatableLocations: ObservableObject {
 }
 
 extension IndividualSnapshot {
- 
     static public func tryLoadCache (name: String) -> IndividualSnapshot?
     {
         if let file = cacheFileForRegion(code: name) {
@@ -218,14 +262,40 @@ public var globalData: GlobalData = {
     }
     abort ()
 }()
+
+var _sortedData: [String] = []
+
+func sortBySubcaption (first: TrackedLocation, second: TrackedLocation) -> Bool {
+    return ("\(first.countryRegion ?? ""), \(first.proviceState ?? ""), \(first.admin ?? "")") <
+    ("\(second.countryRegion ?? ""), \(second.proviceState ?? ""), \(second.admin ?? "")")
+}
+
+public var prettifiedLocations: [String] = {
+    if _sortedData.count != 0 {
+        return _sortedData
+    }
+    let sorted = globalData.globals.values.sorted(by: sortBySubcaption(first:second:))
+    for v in sorted {
+        if (v.admin ?? "") == "" {
+            if (v.proviceState ?? "") == "" {
+                _sortedData.append(v.countryRegion ?? "")
+            } else {
+                _sortedData.append("\(v.proviceState ?? ""), \(v.countryRegion ?? "")")
+            }
+        } else {
+            _sortedData.append("\(v.admin ?? ""), \(v.proviceState ?? ""), \(v.countryRegion ?? "")")
+        }
+    }
+    return _sortedData
+}()
     
 var sd: SnapshotData!
 
 public var emptyStat = Stats(updateTime: Date(), caption: "", subCaption: nil,
                       totalCases: 0, deltaCases: 0,
-                      cases: [], casesDelta: [],
+                      cases: [], casesDelta: [], casesDeltaSmooth: [],
                       totalDeaths: 0, deltaDeaths: 0,
-                      deaths: [], deathsDelta: [])
+                      deaths: [], deathsDelta: [], deathsDeltaSmooth: [])
 
 func makeDelta (_ v: [Int]) -> [Int]
 {
@@ -239,29 +309,6 @@ func makeDelta (_ v: [Int]) -> [Int]
     return result
 }
 
-public func getCaptions (trackedLocation: TrackedLocation) -> (caption: String, subcaption: String?)
-{
-    var caption: String
-    var subcaption: String? = nil
-    
-    if trackedLocation.countryRegion == "US" {
-        if trackedLocation.admin == nil {
-            caption = trackedLocation.proviceState
-        } else {
-            caption = trackedLocation.admin
-            subcaption = trackedLocation.proviceState
-        }
-    } else {
-        if trackedLocation.proviceState == "" {
-            caption = trackedLocation.countryRegion
-        } else {
-            caption = trackedLocation.proviceState
-            subcaption = trackedLocation.countryRegion
-        }
-    }
-    return (caption, subcaption)
-}
-
 public func makeStat (trackedLocation: TrackedLocation, snapshot: Snapshot, date: Date = Date()) -> Stats
 {
     let last2Deaths = Array (snapshot.lastDeaths.suffix(2))
@@ -271,7 +318,7 @@ public func makeStat (trackedLocation: TrackedLocation, snapshot: Snapshot, date
     let totalCases = last2Cases [1]
     let deltaCases = last2Cases[1]-last2Cases[0]
 
-    let (caption, subcaption) = getCaptions (trackedLocation: trackedLocation)
+    let (caption, subcaption) = trackedLocation.getCaptions ()
     
     return Stats (updateTime: date,
                   caption: caption,
@@ -280,10 +327,12 @@ public func makeStat (trackedLocation: TrackedLocation, snapshot: Snapshot, date
                   deltaCases: deltaCases,
                   cases: snapshot.lastConfirmed,
                   casesDelta: makeDelta (snapshot.lastConfirmed),
+                  casesDeltaSmooth: makeDelta (snapshot.lastConfirmed.smoothed()),
                   totalDeaths: totalDeaths,
                   deltaDeaths: deltaDeaths,
                   deaths: snapshot.lastDeaths,
                   deathsDelta: makeDelta (snapshot.lastDeaths),
+                  deathsDeltaSmooth: makeDelta(snapshot.lastDeaths.smoothed()),
                   lat: trackedLocation.lat,
                   long: trackedLocation.long)
 }

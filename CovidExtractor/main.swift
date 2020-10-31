@@ -205,7 +205,7 @@ let casesWorld = "COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_ser
 let days = 40
 var fdeaths = try! CSV(url: URL(fileURLWithPath: prefix + deaths))
 var fcases = try! CSV(url: URL(fileURLWithPath: prefix + cases))
-
+try? FileManager.default.createDirectory(atPath: "/tmp/ind", withIntermediateDirectories: true)
 gd = GlobalData()
 sd = SnapshotData()
 validateUS(fdeaths, fcases)

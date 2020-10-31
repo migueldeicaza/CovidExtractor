@@ -10,6 +10,7 @@
 		4985CF33252F871500C78B5D /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4985CF32252F871500C78B5D /* main.swift */; };
 		4985CF3C252F878F00C78B5D /* SwiftCSV in Frameworks */ = {isa = PBXBuildFile; productRef = 4985CF3B252F878F00C78B5D /* SwiftCSV */; };
 		4985CF74252FF7B400C78B5D /* CovidData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4985CF73252FF7B400C78B5D /* CovidData.swift */; };
+		499AEF72254D092F004E5D23 /* Smoothing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499AEF71254D092F004E5D23 /* Smoothing.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -28,6 +29,7 @@
 		4985CF2F252F871500C78B5D /* CovidExtractor */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = CovidExtractor; sourceTree = BUILT_PRODUCTS_DIR; };
 		4985CF32252F871500C78B5D /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		4985CF73252FF7B400C78B5D /* CovidData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CovidData.swift; sourceTree = "<group>"; };
+		499AEF71254D092F004E5D23 /* Smoothing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Smoothing.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -63,6 +65,7 @@
 			children = (
 				4985CF32252F871500C78B5D /* main.swift */,
 				4985CF73252FF7B400C78B5D /* CovidData.swift */,
+				499AEF71254D092F004E5D23 /* Smoothing.swift */,
 			);
 			path = CovidExtractor;
 			sourceTree = "<group>";
@@ -130,6 +133,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				499AEF72254D092F004E5D23 /* Smoothing.swift in Sources */,
 				4985CF33252F871500C78B5D /* main.swift in Sources */,
 				4985CF74252FF7B400C78B5D /* CovidData.swift in Sources */,
 			);
